@@ -1,0 +1,27 @@
+extends: ../base.yaml
+
+hypothesis:
+  id: H3
+  description: "Hierarchical legal units + BM25/BGE-M3 hybrid retrieval with RRF."
+  variables: ["retrieval.method", "fusion.method"]
+
+indexing:
+  output_dir: artifacts/indexes/h3_hybrid_rrf
+  sparse:
+    enabled: true
+  dense:
+    enabled: true
+    backend: faiss
+    model_name: BAAI/bge-m3
+    device: auto
+    batch_size: 8
+
+retrieval:
+  method: hybrid
+  sparse_top_k: 50
+  dense_top_k: 50
+  candidate_top_k: 50
+
+fusion:
+  method: rrf
+  rrf_k: 60

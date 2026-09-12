@@ -1,0 +1,144 @@
+# -----------------------------------------------------------------------------
+# BASE CONFIG - conservative, cross-platform, medium-machine defaults.
+# Paths are resolved relative to the project root, not the current shell folder.
+# -----------------------------------------------------------------------------
+project:
+  name: legal-retrieval-experiments
+  seed: 42
+
+hypothesis:
+  id: BASE
+  description: "Baseline configuration; copy hypothesis_template.yaml for experiments."
+  variables: []
+  notes: ""
+
+corpus:
+  input_glob: data/enriched/*_enriched.json
+  # Workstream A also has document/chapter records. The default retrieval units
+  # follow the diagram: Article / Clause / Point.
+  include_unit_types: [article, clause, point]
+  required_fields: [unit_id, doc_id, unit_type, text]
+
+representation:
+  # hierarchical_units | fixed_length
+  mode: hierarchical_units
+
+  # Text sent to sparse/dense indexing. Toggle fields to test feature hypotheses.
+  fields:
+    - name: citation_surface
+      prefix: "[CITATION] "
+      enabled: true
+    - name: title_chain
+      prefix: "[TITLE] "
+      enabled: true
+    - name: text
+      prefix: "[TEXT] "
+      enabled: true
+  separator: "\n"
+
+  fixed_length:
+    # Used only when mode=fixed_length.
+    source_unit_types: [article, clause, point]
+    unit: words
+    chunk_size: 220
+    overlap: 40
+
+query_processing:
+  normalize_whitespace: true
+  lowercase_for_sparse: true
+  fold_vietnamese_for_sparse: true
+  query_expansion:
+    enabled: false
+    method: static_map
+    # If a key occurs in the normalized query, append these expressions.
+    static_map:
+      "sổ đỏ": ["giấy chứng nhận quyền sử dụng đất"]
+      "qsdđ": ["quyền sử dụng đất"]
+  metadata_filter:
+    enabled: true
+    oversample_factor: 4
+
+indexing:
+  # This is an artifact namespace. The actual immutable index is stored under
+  # <output_dir>/<content-signature>/, so model/config variants never overwrite.
+  output_dir: artifacts/indexes/base
+  sparse:
+    enabled: true
+    backend: bm25
+    k1: 1.5
+    b: 0.75
+
+  dense:
+    enabled: false
+    # faiss | numpy_flat | future registered backend
+    backend: faiss
+    index_type: FlatIP
+    model_name: BAAI/bge-m3
+    # Pin this to a Hugging Face commit hash for publication-grade reproducibility.
+    revision: null
+    device: auto
+    batch_size: 8
+    normalize_embeddings: true
+    trust_remote_code: false
+    document_prefix: ""
+    query_prefix: ""
+
+retrieval:
+  # sparse | dense | hybrid
+  method: sparse
+  sparse_top_k: 50
+  dense_top_k: 50
+  candidate_top_k: 50
+
+fusion:
+  # none | rrf | weighted
+  method: none
+  rrf_k: 60
+  sparse_weight: 0.5
+  dense_weight: 0.5
+  score_normalization: minmax
+
+reranking:
+  enabled: false
+  top_n: 30
+  batch_size: 8
+  # weighted | rrf
+  aggregation: weighted
+  rrf_k: 60
+  models: []
+  # Example:
+  # models:
+  #   - model_name: BAAI/bge-reranker-v2-m3
+  #     weight: 1.0
+  #     device: auto
+  #     trust_remote_code: false
+
+ranking:
+  final_top_k: 10
+  # none | record_id | source_unit
+  deduplicate_by: source_unit
+
+api:
+  host: 127.0.0.1
+  port: 8000
+
+# Benchmark is intentionally null because Workstream C is not available yet.
+evaluation:
+  benchmark_path: null
+  query_field: query
+  query_id_field: query_id
+  relevant_ids_field: relevant_unit_ids
+  filters_field: filters
+  # source_unit is recommended because it also evaluates fixed-length chunks.
+  match_by: source_unit
+  metrics: [hit_rate, precision, recall, mrr, ndcg, map]
+  k_values: [1, 3, 5, 10, 20]
+  save_per_query: true
+
+runtime:
+  auto_build_index: true
+  rebuild_if_config_changed: true
+  # Kept for CLI compatibility. Completed content-addressed indexes are immutable
+  # and are reused even when a force build is requested.
+  force_rebuild: false
+  log_level: INFO

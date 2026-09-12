@@ -1,0 +1,15 @@
+extends: base.yaml
+
+hypothesis:
+  id: H_NEW
+  description: "Write the research hypothesis here."
+  variables:
+    - "representation.mode"
+  notes: "Only override variables that belong to this hypothesis."
+
+indexing:
+  output_dir: artifacts/indexes/H_NEW
+
+# Example override:
+# representation:
+#   mode: fixed_length

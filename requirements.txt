@@ -1,0 +1,2 @@
+# Convenient full install. For a lighter install use: pip install -e .
+-e .[all]

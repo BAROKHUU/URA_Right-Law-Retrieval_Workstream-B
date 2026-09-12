@@ -1,0 +1,23 @@
+extends: ../base.yaml
+
+hypothesis:
+  id: H2
+  description: "Hierarchical legal units + dense BGE-M3 retrieval."
+  variables: ["retrieval.method", "indexing.dense.model_name"]
+
+indexing:
+  output_dir: artifacts/indexes/h2_dense_hierarchical
+  sparse:
+    enabled: false
+  dense:
+    enabled: true
+    backend: faiss
+    model_name: BAAI/bge-m3
+    device: auto
+    batch_size: 8
+
+retrieval:
+  method: dense
+
+fusion:
+  method: none

@@ -1,0 +1,20 @@
+extends: h3_hybrid_rrf.yaml
+
+hypothesis:
+  id: H4
+  description: "Hybrid RRF candidates + configurable Hugging Face CrossEncoder reranking."
+  variables: ["reranking.enabled", "reranking.models"]
+
+indexing:
+  output_dir: artifacts/indexes/h3_hybrid_rrf
+
+reranking:
+  enabled: true
+  top_n: 30
+  batch_size: 8
+  aggregation: weighted
+  models:
+    - model_name: BAAI/bge-reranker-v2-m3
+      weight: 1.0
+      device: auto
+      trust_remote_code: false

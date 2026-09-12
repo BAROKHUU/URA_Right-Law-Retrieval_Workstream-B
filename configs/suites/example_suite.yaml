@@ -1,0 +1,5 @@
+continue_on_error: false
+configs:
+  - ../examples/h1_sparse_hierarchical.yaml
+  - ../examples/h2_dense_hierarchical.yaml
+  - ../examples/h3_hybrid_rrf.yaml

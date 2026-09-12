@@ -1,0 +1,19 @@
+extends: ../base.yaml
+
+hypothesis:
+  id: H1
+  description: "Hierarchical legal units + BM25 baseline."
+  variables: ["representation.mode", "retrieval.method"]
+
+indexing:
+  output_dir: artifacts/indexes/h1_sparse_hierarchical
+  sparse:
+    enabled: true
+  dense:
+    enabled: false
+
+retrieval:
+  method: sparse
+
+fusion:
+  method: none

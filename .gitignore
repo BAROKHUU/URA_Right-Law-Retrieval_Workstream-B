@@ -1,0 +1,12 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.vscode/*.local.json
+artifacts/indexes/*
+artifacts/runs/*
+!artifacts/indexes/.gitkeep
+!artifacts/runs/.gitkeep
+.DS_Store
+Thumbs.db

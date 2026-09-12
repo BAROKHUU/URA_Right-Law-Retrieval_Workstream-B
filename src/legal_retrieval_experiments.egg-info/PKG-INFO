@@ -1,0 +1,205 @@
+Metadata-Version: 2.4
+Name: legal-retrieval-experiments
+Version: 0.1.0
+Summary: Config-driven legal retrieval experimentation framework for enriched Vietnamese legal units.
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.24
+Requires-Dist: PyYAML>=6.0
+Provides-Extra: dense
+Requires-Dist: sentence-transformers>=3.0; extra == "dense"
+Requires-Dist: faiss-cpu>=1.8.0; extra == "dense"
+Provides-Extra: api
+Requires-Dist: fastapi>=0.110; extra == "api"
+Requires-Dist: uvicorn[standard]>=0.29; extra == "api"
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Provides-Extra: all
+Requires-Dist: sentence-transformers>=3.0; extra == "all"
+Requires-Dist: faiss-cpu>=1.8.0; extra == "all"
+Requires-Dist: fastapi>=0.110; extra == "all"
+Requires-Dist: uvicorn[standard]>=0.29; extra == "all"
+Requires-Dist: pytest>=8.0; extra == "all"
+
+# Legal Retrieval Experiments
+
+A config-driven retrieval codebase based on the provided indexing -> retrieval -> ranking -> API -> evaluation diagram and the enriched Workstream A corpus.
+
+The main design goal is **change the hypothesis in YAML, not in source code**. The repository supports hierarchical legal units, fixed-length chunks, BM25, dense retrieval, hybrid fusion, optional Hugging Face cross-encoder reranking, API serving, and configurable evaluation metrics.
+
+## 1. What is already included
+
+The folder `data/enriched/` contains the 11 enhanced JSON files copied from Workstream A. The loader understands these fields directly: `unit_id`, `doc_id`, `doc_number`, `doc_type`, `doc_title`, `unit_type`, `article`, `clause`, `point`, `parent_path`, `title_chain`, `citation_surface`, `text`, `text_folded`, effective dates, URL, and snapshot metadata.
+
+No real benchmark is assumed yet. `data/benchmarks/schema_example.jsonl` is only a format example. When Workstream C is ready, point `evaluation.benchmark_path` at the new JSON/JSONL file.
+
+## 2. Quick start
+
+Create and activate a virtual environment.
+
+**Windows PowerShell**
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -U pip
+pip install -e ".[all]"
+```
+
+**Linux/macOS**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+pip install -e ".[all]"
+```
+
+If you only want BM25 first, `pip install -e .` is enough.
+
+Build the index configured in `configs/base.yaml`:
+
+```bash
+python scripts/build_index.py --config configs/base.yaml
+```
+
+Retrieve one query:
+
+```bash
+python scripts/retrieve.py --config configs/base.yaml --query "điều kiện cấp giấy chứng nhận quyền sử dụng đất"
+```
+
+Run a hypothesis configuration:
+
+```bash
+python scripts/run_experiment.py --config configs/examples/h1_sparse_hierarchical.yaml
+```
+
+Run several configurations and compare them:
+
+```bash
+python scripts/run_suite.py --suite configs/suites/example_suite.yaml
+python scripts/compare_experiments.py --runs-dir artifacts/runs
+```
+
+Start API:
+
+```bash
+python scripts/serve_api.py --config configs/base.yaml
+```
+
+Then POST to `/retrieve` with JSON such as:
+
+```json
+{
+  "query": "đăng ký đất đai",
+  "top_k": 10,
+  "filters": {"doc_type": "decree"}
+}
+```
+
+## 3. Hypothesis workflow
+
+A hypothesis is metadata plus a set of controlled YAML variables. Copy `configs/hypothesis_template.yaml`, give it an ID and description, change only the variables you want to test, and run it.
+
+Typical comparisons:
+
+- `representation.mode`: `hierarchical_units` vs `fixed_length`
+- BM25 only vs dense only vs hybrid
+- dense `backend`: `faiss` vs `numpy_flat` or a future custom backend
+- dense Hugging Face embedding model
+- RRF vs weighted score fusion
+- reranker off vs one or multiple Hugging Face cross-encoders
+- title/citation features included vs excluded
+- retrieval candidate depth and final `top_k`
+- metadata filtering
+- evaluation metric set and K values
+
+Every experiment saves its resolved config, results, metrics, and run metadata under `artifacts/runs/<experiment>/<run-id>/` so the exact setup remains reproducible.
+
+## 4. Configuration map
+
+The heavily commented `configs/base.yaml` is the source of truth. Example hypothesis files use `extends: ../base.yaml`, then override only changed values.
+
+Important sections:
+
+- `corpus`: enriched input path and selected unit types
+- `representation`: hierarchical/fixed chunking and indexed text fields
+- `query_processing`: normalization, static expansion, filtering
+- `indexing.sparse`: BM25 settings
+- `indexing.dense`: backend, embedding model, device, batch size
+- `retrieval`: sparse/dense/hybrid and candidate depths
+- `fusion`: RRF or weighted fusion
+- `reranking`: optional one/multiple Hugging Face rerankers
+- `ranking`: final top-K and deduplication
+- `evaluation`: benchmark path, matching, metrics, K values
+- `runtime`: index reuse/rebuild behavior
+
+## 5. Representation modes
+
+### `hierarchical_units`
+
+Each Article / Clause / Point from Workstream A becomes one retrieval record. This preserves the legal hierarchy and keeps the original `unit_id` as the record ID.
+
+### `fixed_length`
+
+Selected legal units are concatenated document-by-document in corpus order and split by a configurable word window. Every generated chunk stores `source_unit_ids`, which lets future evaluation match a returned chunk back to one or more original legal units.
+
+## 6. Dense index extensibility
+
+`src/legal_retrieval/indexing/dense.py` contains a backend registry. Today it ships with:
+
+- `faiss`: default FAISS inner-product index
+- `numpy_flat`: dependency-light exact cosine/dot-product fallback
+
+A future vector database can be added by implementing the same `BaseDenseIndex` interface and registering it with `register_dense_backend(...)`. YAML then selects the new backend without changing the retrieval pipeline.
+
+The embedding model is also config-driven. `sentence-transformers` is used as the generic Hugging Face encoder layer; `BAAI/bge-m3` is provided in dense examples but can be replaced by another compatible model ID.
+
+## 7. Reranker extensibility
+
+The reranking layer accepts a list of Hugging Face CrossEncoder-compatible model IDs. With one model it behaves as a normal reranker. With multiple models, combine them using weighted normalized scores or RRF-style rank fusion.
+
+Example:
+
+```yaml
+reranking:
+  enabled: true
+  top_n: 30
+  aggregation: weighted
+  models:
+    - model_name: BAAI/bge-reranker-v2-m3
+      weight: 1.0
+      device: auto
+```
+
+## 8. Benchmark format
+
+Combined JSONL is the easiest format:
+
+```json
+{"query_id":"q001","query":"...","relevant_unit_ids":["doc__article-1__v..."],"filters":{}}
+```
+
+JSON arrays with the same objects are also accepted. Ground truth is optional per row, so a query-only file can still produce retrieval outputs. Metrics are computed only for rows that have relevance labels.
+
+Supported metric names:
+
+- `hit_rate`
+- `precision`
+- `recall`
+- `mrr`
+- `ndcg`
+- `map`
+
+Choose any subset plus any list of K values in YAML.
+
+## 9. Medium-machine defaults
+
+The safe base configuration is sparse-only, so it runs without downloading a large model. Dense examples use conservative defaults: `device: auto`, batch size 8, normalized embeddings, FAISS `FlatIP`, candidate depth 50.
+
+For lower-memory machines: reduce dense `batch_size`, final candidate depths, and reranker `batch_size`. For stronger GPUs: increase batch sizes. Index backend/model choices stay entirely in config.
+
+## 10. VSCode
+
+The repository includes `.vscode/launch.json` with launch configurations for building an index, retrieving a query, running an experiment, and serving the API. Select your `.venv` interpreter first.
