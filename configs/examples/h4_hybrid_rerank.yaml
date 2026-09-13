@@ -15,6 +15,7 @@ reranking:
   aggregation: weighted
   models:
     - model_name: BAAI/bge-reranker-v2-m3
+      revision: null
       weight: 1.0
       device: auto
       trust_remote_code: false

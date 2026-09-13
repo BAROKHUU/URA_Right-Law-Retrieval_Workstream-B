@@ -74,7 +74,8 @@ indexing:
     backend: faiss
     index_type: FlatIP
     model_name: BAAI/bge-m3
-    # Pin this to a Hugging Face commit hash for publication-grade reproducibility.
+    # Required in runtime.reproducibility_mode=final.
+    # Use the full 40-character Hugging Face commit SHA.
     revision: null
     device: auto
     batch_size: 8
@@ -109,6 +110,7 @@ reranking:
   # Example:
   # models:
   #   - model_name: BAAI/bge-reranker-v2-m3
+  #     revision: 0123456789abcdef0123456789abcdef01234567
   #     weight: 1.0
   #     device: auto
   #     trust_remote_code: false
@@ -142,3 +144,6 @@ runtime:
   # and are reused even when a force build is requested.
   force_rebuild: false
   log_level: INFO
+  # development: revisions may be null while iterating quickly.
+  # final: every enabled Hugging Face dense/reranker model must use a 40-char SHA.
+  reproducibility_mode: development

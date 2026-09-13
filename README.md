@@ -16,7 +16,7 @@ A YAML-driven framework for evaluating legal-text retrieval configurations. The 
 ### Linux/macOS
 
 ```bash
-cd /home/barokhuu/workspace/URA/legal-retrieval-experiments
+cd /path/to/legal-retrieval-experiments
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
@@ -46,6 +46,18 @@ pytest -q
 ```
 
 Dense retrieval and reranking require Sentence Transformers, PyTorch, and FAISS. Model weights are downloaded from Hugging Face the first time a model is used.
+
+## Reproducible Docker environment
+
+Development installs may continue to use `pip install -e ".[all]"`. For a fixed experiment environment, use the included `Dockerfile` and `requirements.lock`:
+
+```bash
+docker build -t legal-retrieval:locked .
+docker run --rm -it legal-retrieval:locked \
+  python scripts/run_experiment.py --config configs/examples/h1_sparse_hierarchical.yaml
+```
+
+The container sets `LEGAL_RETRIEVAL_PROJECT_ROOT=/app`. Outside Docker, the framework first checks this environment variable and otherwise searches upward for the repository markers. It no longer assumes that the package always lives exactly two parent directories below the project root.
 
 ## 2. Repository layout
 
@@ -141,10 +153,12 @@ ranking:
 Configuration guidelines:
 
 - Give every experiment a stable, unique `hypothesis.id`.
-- List the intentionally changed values in `hypothesis.variables`.
+- `hypothesis.variables` is an allow-list of scientific config paths that may differ from the config named by the experiment's immediate `extends`.
+- The loader automatically computes `Declared changes` and `Actual changes`; an undeclared actual change raises an error before indexing/retrieval starts.
+- `hypothesis.*` and `indexing.output_dir` are bookkeeping fields and are excluded from scientific diffing.
+- A declaration may authorize a subtree, e.g. `reranking.models` covers `reranking.models[0].model_name`, `.revision`, `.weight`, etc.
 - Keep unrelated settings fixed for a controlled comparison.
-- Use a readable `indexing.output_dir` namespace.
-- Pin each Hugging Face `revision` to a commit hash for final runs.
+- For publication/final runs, set `runtime.reproducibility_mode: final` and pin every enabled Hugging Face model `revision` to its full 40-character commit SHA.
 - Do not edit `artifacts/` while an index is being built.
 
 The main configuration groups are:
@@ -174,7 +188,8 @@ Use `retrieve.py` for quick inspection. `--config` selects the experiment config
 python scripts/retrieve.py \
   --config configs/examples/h1_sparse_hierarchical.yaml \
   --query "điều kiện cấp giấy chứng nhận quyền sử dụng đất" \
-  --top-k 10
+  --top-k 10\
+  > artifacts/reports/h1_sparse_hierachical.json
 ```
 
 ### H2: dense retrieval
@@ -183,7 +198,8 @@ python scripts/retrieve.py \
 python scripts/retrieve.py \
   --config configs/examples/h2_dense_hierarchical.yaml \
   --query "điều kiện cấp giấy chứng nhận quyền sử dụng đất" \
-  --top-k 10
+  --top-k 10 \
+  > artifacts/reports/h2_dense_hierarchical.json
 ```
 
 ### H3: BM25 + dense + RRF
@@ -192,7 +208,8 @@ python scripts/retrieve.py \
 python scripts/retrieve.py \
   --config configs/examples/h3_hybrid_rrf.yaml \
   --query "trình tự đăng ký đất đai" \
-  --top-k 10
+  --top-k 10 \ 
+  > artifacts/reports/h3_hybrid_rrf.json
 ```
 
 ### H4: hybrid retrieval + reranking
@@ -201,7 +218,8 @@ python scripts/retrieve.py \
 python scripts/retrieve.py \
   --config configs/examples/h4_hybrid_rerank.yaml \
   --query "điều kiện chuyển nhượng quyền sử dụng đất" \
-  --top-k 10
+  --top-k 10 \
+  > artifacts/reports/h4_hybrid_rerank.json
 ```
 
 ### H5: fixed-length chunks + hybrid retrieval
@@ -210,7 +228,8 @@ python scripts/retrieve.py \
 python scripts/retrieve.py \
   --config configs/examples/h5_fixed_length_hybrid.yaml \
   --query "điều kiện cấp giấy chứng nhận quyền sử dụng đất" \
-  --top-k 10
+  --top-k 10 \
+  > artifacts/reports/h5_fixed_length_hybrid.json
 ```
 
 Metadata filters can be repeated:

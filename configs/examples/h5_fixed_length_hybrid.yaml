@@ -3,7 +3,9 @@ extends: h3_hybrid_rrf.yaml
 hypothesis:
   id: H5
   description: "Fixed-length document-wise chunks vs hierarchical legal units under the same hybrid retriever."
-  variables: ["representation.mode", "representation.fixed_length.chunk_size", "representation.fixed_length.overlap"]
+  variables:
+    - "representation.mode"
+    - "ranking.deduplicate_by"
 
 representation:
   mode: fixed_length

@@ -76,6 +76,11 @@ def run_experiment(cfg: dict[str, Any]) -> Path:
     (run_dir / "resolved_config.yaml").write_text(
         yaml.safe_dump(clean_cfg, allow_unicode=True, sort_keys=False), encoding="utf-8"
     )
+    hypothesis_diff = cfg.get("_hypothesis_diff", {})
+    logger.info("Hypothesis baseline: %s", cfg.get("_baseline_config_path"))
+    logger.info("Declared changes = %s", hypothesis_diff.get("declared_changes", []))
+    logger.info("Actual changes = %s", hypothesis_diff.get("actual_changes", []))
+
     run_metadata = {
         "run_id": run_dir.name,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -84,6 +89,10 @@ def run_experiment(cfg: dict[str, Any]) -> Path:
         "platform": platform.platform(),
         "git_revision": _git_revision(),
         "package_versions": _package_versions(),
+        "reproducibility_mode": cfg.get("runtime", {}).get("reproducibility_mode", "development"),
+        "config_path": cfg.get("_config_path"),
+        "baseline_config_path": cfg.get("_baseline_config_path"),
+        "hypothesis_diff": hypothesis_diff,
     }
     (run_dir / "run_metadata.json").write_text(
         json.dumps(run_metadata, ensure_ascii=False, indent=2), encoding="utf-8"

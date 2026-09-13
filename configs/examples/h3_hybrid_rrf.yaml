@@ -3,7 +3,10 @@ extends: ../base.yaml
 hypothesis:
   id: H3
   description: "Hierarchical legal units + BM25/BGE-M3 hybrid retrieval with RRF."
-  variables: ["retrieval.method", "fusion.method"]
+  variables:
+    - "indexing.dense.enabled"
+    - "retrieval.method"
+    - "fusion.method"
 
 indexing:
   output_dir: artifacts/indexes/h3_hybrid_rrf
