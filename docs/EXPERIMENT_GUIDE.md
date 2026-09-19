@@ -25,6 +25,13 @@ are lightweight BM25 comparison groups. H2-H5 download Hugging Face models and
 may require substantial time, RAM, and disk space. A GPU is optional but
 recommended.
 
+All H1-H9 files intentionally follow the same top-level section order and
+repeat their effective indexing, retrieval, fusion, reranking, ranking, and
+temporal settings so that each YAML file is readable on its own. Mode-specific
+representation blocks differ only where required by hierarchical, fixed-length,
+or parent-child construction. The files still use `extends` to validate
+controlled scientific differences between hypotheses.
+
 ## 2. Environment setup
 
 ### Local Python

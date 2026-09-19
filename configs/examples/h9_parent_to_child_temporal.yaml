@@ -8,13 +8,88 @@ hypothesis:
     - retrieval.parent_child.enabled
 
 representation:
+  mode: parent_child
   parent_child:
+    parent_unit_type: article
+    child_unit_types: [clause, point]
     include_parent_records: true
+    orphan_policy: error
+    child_fields:
+      - name: citation_surface
+        prefix: "[CITATION] "
+        enabled: true
+      - name: text
+        prefix: "[CHILD] "
+        enabled: true
+    parent_fields:
+      - name: citation_surface
+        prefix: "[CITATION] "
+        enabled: true
+      - name: title_chain
+        prefix: "[TITLE] "
+        enabled: true
+      - name: text
+        prefix: "[TEXT] "
+        enabled: true
+    context:
+      include_parent_heading: true
+      parent_prefix: "[PARENT] "
+      parent_heading_max_words: 40
 
 indexing:
   output_dir: artifacts/indexes/h9_parent_to_child_temporal
+  sparse:
+    enabled: true
+    backend: bm25
+    k1: 1.5
+    b: 0.75
+  dense:
+    enabled: false
+    backend: faiss
+    index_type: FlatIP
+    model_name: BAAI/bge-m3
+    revision: null
+    device: auto
+    batch_size: 8
+    normalize_embeddings: true
+    trust_remote_code: false
+    document_prefix: ""
+    query_prefix: ""
 
 retrieval:
+  method: sparse
+  sparse_top_k: 50
+  dense_top_k: 50
+  candidate_top_k: 50
   parent_child:
     enabled: true
+    parent_top_k: 10
+    child_top_k: 50
+    rrf_k: 60
+    parent_weight: 0.7
+    child_weight: 1.0
 
+fusion:
+  method: none
+  rrf_k: 60
+  sparse_weight: 0.5
+  dense_weight: 0.5
+  score_normalization: minmax
+
+reranking:
+  enabled: false
+  top_n: 30
+  batch_size: 8
+  aggregation: weighted
+  rrf_k: 60
+  models: []
+
+ranking:
+  final_top_k: 10
+  deduplicate_by: source_unit
+
+temporal:
+  enabled: true
+  reference_date: "2026-09-19"
+  missing_date_policy: error
+  strip_time_from_query: true

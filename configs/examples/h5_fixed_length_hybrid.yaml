@@ -9,6 +9,16 @@ hypothesis:
 
 representation:
   mode: fixed_length
+  fields:
+    - name: citation_surface
+      prefix: "[CITATION] "
+      enabled: true
+    - name: title_chain
+      prefix: "[TITLE] "
+      enabled: true
+    - name: text
+      prefix: "[TEXT] "
+      enabled: true
   fixed_length:
     source_unit_types: [article, clause, point]
     unit: words
@@ -17,7 +27,59 @@ representation:
 
 indexing:
   output_dir: artifacts/indexes/h5_fixed_length_hybrid
+  sparse:
+    enabled: true
+    backend: bm25
+    k1: 1.5
+    b: 0.75
+  dense:
+    enabled: true
+    backend: faiss
+    index_type: FlatIP
+    model_name: BAAI/bge-m3
+    revision: null
+    device: auto
+    batch_size: 8
+    normalize_embeddings: true
+    trust_remote_code: false
+    document_prefix: ""
+    query_prefix: ""
+
+retrieval:
+  method: hybrid
+  sparse_top_k: 50
+  dense_top_k: 50
+  candidate_top_k: 50
+  parent_child:
+    enabled: false
+    parent_top_k: 10
+    child_top_k: 50
+    rrf_k: 60
+    parent_weight: 0.7
+    child_weight: 1.0
+
+fusion:
+  method: rrf
+  rrf_k: 60
+  sparse_weight: 0.5
+  dense_weight: 0.5
+  score_normalization: minmax
+
+reranking:
+  enabled: false
+  top_n: 30
+  batch_size: 8
+  aggregation: weighted
+  rrf_k: 60
+  models: []
 
 ranking:
+  final_top_k: 10
   # Fixed chunks are synthetic records; keep distinct chunks by default.
   deduplicate_by: record_id
+
+temporal:
+  enabled: false
+  reference_date: null
+  missing_date_policy: error
+  strip_time_from_query: true
