@@ -1,0 +1,16 @@
+extends: h7_child_temporal.yaml
+
+hypothesis:
+  id: H8
+  description: "Clause/Point children enriched with their Article heading and temporal pre-filtering."
+  variables:
+    - representation.parent_child.context.include_parent_heading
+
+representation:
+  parent_child:
+    context:
+      include_parent_heading: true
+
+indexing:
+  output_dir: artifacts/indexes/h8_contextual_child_temporal
+

@@ -122,6 +122,7 @@ def run_experiment(cfg: dict[str, Any]) -> Path:
             "query_id": item.query_id,
             "query": item.query,
             "filters": item.filters,
+            "query_context": pipeline.last_query_context,
             "relevant_unit_ids": item.relevant_ids,
             "results": [h.to_dict(include_text=True) for h in hits],
         }

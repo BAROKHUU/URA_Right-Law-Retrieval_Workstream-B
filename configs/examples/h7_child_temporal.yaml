@@ -1,0 +1,21 @@
+extends: ../base.yaml
+
+hypothesis:
+  id: H7
+  description: "Independent Clause/Point children with temporal pre-filtering."
+  variables:
+    - representation.mode
+    - temporal.enabled
+    - temporal.reference_date
+
+representation:
+  mode: parent_child
+
+indexing:
+  output_dir: artifacts/indexes/h7_child_temporal
+
+temporal:
+  enabled: true
+  # Pin this for reproducible experiments; update intentionally for deployment.
+  reference_date: "2026-09-19"
+

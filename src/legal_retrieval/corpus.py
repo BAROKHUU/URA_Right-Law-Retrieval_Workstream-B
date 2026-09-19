@@ -37,15 +37,19 @@ def load_enriched_units(cfg: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def build_index_text(unit: dict[str, Any], rep_cfg: dict[str, Any]) -> str:
+    return _build_text_from_fields(unit, rep_cfg.get("fields", []), rep_cfg.get("separator", "\n"))
+
+
+def _build_text_from_fields(unit: dict[str, Any], fields: list[dict[str, Any]], separator: str = "\n") -> str:
     parts: list[str] = []
-    for spec in rep_cfg.get("fields", []):
+    for spec in fields:
         if not spec.get("enabled", True):
             continue
         value = unit.get(spec["name"])
         if value is None or str(value).strip() == "":
             continue
         parts.append(f"{spec.get('prefix', '')}{normalize_whitespace(str(value))}")
-    return rep_cfg.get("separator", "\n").join(parts)
+    return separator.join(parts)
 
 
 def _metadata_from_unit(unit: dict[str, Any]) -> dict[str, Any]:
@@ -138,6 +142,106 @@ def _fixed_length_records(units: list[dict[str, Any]], cfg: dict[str, Any]) -> l
     return records
 
 
+def _hierarchy_key(unit: dict[str, Any]) -> tuple[str, str, str, str]:
+    """Identify an article version without parsing the display-oriented unit_id."""
+    return (
+        str(unit.get("doc_id", "")),
+        str(unit.get("article", "")),
+        str(unit.get("effective_from") or ""),
+        str(unit.get("effective_to") or ""),
+    )
+
+
+def _short_parent_heading(parent: dict[str, Any], max_words: int) -> str:
+    # Workstream A article text starts with the article number and heading. Some
+    # rows also contain a short lead sentence, so cap it rather than copying a
+    # whole parent body into every child.
+    raw = normalize_whitespace(str(parent.get("text") or ""))
+    if not raw:
+        raw = normalize_whitespace(str(parent.get("title_chain") or "").split(">")[-1])
+    words = raw.split()
+    return " ".join(words[:max_words])
+
+
+def _parent_child_records(units: list[dict[str, Any]], cfg: dict[str, Any]) -> list[RetrievalRecord]:
+    rep_cfg = cfg["representation"]
+    pcfg = rep_cfg["parent_child"]
+    qp = cfg.get("query_processing", {})
+    separator = rep_cfg.get("separator", "\n")
+    parent_type = pcfg.get("parent_unit_type", "article")
+    child_types = set(pcfg.get("child_unit_types", ["clause", "point"]))
+    child_fields = pcfg.get("child_fields", [{"name": "text", "prefix": "[TEXT] "}])
+    parent_fields = pcfg.get("parent_fields", rep_cfg.get("fields", []))
+    context_cfg = pcfg.get("context", {})
+    include_heading = bool(context_cfg.get("include_parent_heading", False))
+    max_heading_words = int(context_cfg.get("parent_heading_max_words", 40))
+    orphan_policy = pcfg.get("orphan_policy", "error")
+
+    parents = { _hierarchy_key(unit): unit for unit in units if unit.get("unit_type") == parent_type }
+    records: list[RetrievalRecord] = []
+
+    if pcfg.get("include_parent_records", False):
+        for parent in parents.values():
+            text = _build_text_from_fields(parent, parent_fields, separator)
+            metadata = _metadata_from_unit(parent)
+            metadata.update({
+                "retrieval_role": "parent",
+                "parent_id": None,
+                "article_id": parent["unit_id"],
+            })
+            records.append(RetrievalRecord(
+                record_id=parent["unit_id"],
+                text=text,
+                sparse_text=sparse_normalize(
+                    text,
+                    lowercase=qp.get("lowercase_for_sparse", True),
+                    fold=qp.get("fold_vietnamese_for_sparse", True),
+                ),
+                source_unit_ids=[parent["unit_id"]],
+                metadata=metadata,
+            ))
+
+    for child in units:
+        if child.get("unit_type") not in child_types:
+            continue
+        parent = parents.get(_hierarchy_key(child))
+        if parent is None:
+            if orphan_policy == "skip":
+                continue
+            raise ValueError(
+                "Cannot resolve article parent for child "
+                f"{child.get('unit_id')!r} using doc/article/effective interval"
+            )
+
+        child_text = _build_text_from_fields(child, child_fields, separator)
+        heading = _short_parent_heading(parent, max_heading_words)
+        text = separator.join(
+            part for part in (
+                f"{context_cfg.get('parent_prefix', '[PARENT] ')}{heading}" if include_heading and heading else "",
+                child_text,
+            ) if part
+        )
+        metadata = _metadata_from_unit(child)
+        metadata.update({
+            "retrieval_role": "child",
+            "parent_id": parent["unit_id"],
+            "article_id": parent["unit_id"],
+            "parent_heading": heading,
+        })
+        records.append(RetrievalRecord(
+            record_id=child["unit_id"],
+            text=text,
+            sparse_text=sparse_normalize(
+                text,
+                lowercase=qp.get("lowercase_for_sparse", True),
+                fold=qp.get("fold_vietnamese_for_sparse", True),
+            ),
+            source_unit_ids=[child["unit_id"]],
+            metadata=metadata,
+        ))
+    return records
+
+
 def build_records(cfg: dict[str, Any]) -> list[RetrievalRecord]:
     units = load_enriched_units(cfg)
     mode = cfg["representation"]["mode"]
@@ -145,4 +249,6 @@ def build_records(cfg: dict[str, Any]) -> list[RetrievalRecord]:
         return _hierarchical_records(units, cfg)
     if mode == "fixed_length":
         return _fixed_length_records(units, cfg)
+    if mode == "parent_child":
+        return _parent_child_records(units, cfg)
     raise ValueError(mode)

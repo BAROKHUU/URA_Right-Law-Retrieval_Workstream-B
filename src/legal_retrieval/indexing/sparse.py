@@ -34,10 +34,12 @@ class BM25Index:
             for term, freq in df.items()
         }
 
-    def search(self, query: str, top_k: int) -> list[SearchHit]:
+    def search(self, query: str, top_k: int, allowed_record_ids: set[str] | None = None) -> list[SearchHit]:
         q_tokens = tokenize(query)
         scores: list[tuple[float, str]] = []
         for i, tf in enumerate(self.term_freqs):
+            if allowed_record_ids is not None and self.doc_ids[i] not in allowed_record_ids:
+                continue
             dl = self.doc_lengths[i]
             score = 0.0
             for term in q_tokens:

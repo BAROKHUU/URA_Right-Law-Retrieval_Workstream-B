@@ -1,0 +1,20 @@
+extends: h8_contextual_child_temporal.yaml
+
+hypothesis:
+  id: H9
+  description: "Retrieve Articles first, then rank contextual children within selected Articles, with temporal pre-filtering."
+  variables:
+    - representation.parent_child.include_parent_records
+    - retrieval.parent_child.enabled
+
+representation:
+  parent_child:
+    include_parent_records: true
+
+indexing:
+  output_dir: artifacts/indexes/h9_parent_to_child_temporal
+
+retrieval:
+  parent_child:
+    enabled: true
+

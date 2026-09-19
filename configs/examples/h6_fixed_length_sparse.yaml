@@ -1,0 +1,29 @@
+extends: h1_sparse_hierarchical.yaml
+
+hypothesis:
+  id: H6
+  description: "Fixed-length document-wise chunks vs hierarchical legal units under the same sparse BM25 retriever."
+  variables:
+    - "representation.mode"
+    - "representation.fixed_length.source_unit_types"
+    - "representation.fixed_length.unit"
+    - "representation.fixed_length.chunk_size"
+    - "representation.fixed_length.overlap"
+    - "ranking.deduplicate_by"
+
+representation:
+  mode: fixed_length
+
+  fixed_length:
+    source_unit_types: [article, clause, point]
+    unit: words
+    chunk_size: 220
+    overlap: 40
+
+indexing:
+  output_dir: artifacts/indexes/h6_fixed_length_sparse
+
+ranking:
+  # Fixed-length chunks are synthetic records,
+  # so keep different chunks as different retrieval records.
+  deduplicate_by: record_id

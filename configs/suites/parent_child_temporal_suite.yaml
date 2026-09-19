@@ -1,0 +1,5 @@
+continue_on_error: false
+configs:
+  - ../examples/h7_child_temporal.yaml
+  - ../examples/h8_contextual_child_temporal.yaml
+  - ../examples/h9_parent_to_child_temporal.yaml

@@ -11,6 +11,11 @@ A YAML-driven framework for evaluating legal-text retrieval configurations. The 
 - multi-query evaluation and experiment comparison;
 - immutable, content-addressed index artifacts.
 
+For the complete H1-H9 matrix, commands, temporal semantics, benchmark setup,
+and result interpretation, use the canonical
+[`docs/EXPERIMENT_GUIDE.md`](docs/EXPERIMENT_GUIDE.md). This README covers only
+installation and framework concepts.
+
 ## 1. Setup
 
 ### Linux/macOS
@@ -180,77 +185,19 @@ See `configs/base.yaml` for the complete set of options.
 
 ## 4. Run a single query
 
-Use `retrieve.py` for quick inspection. `--config` selects the experiment configuration and `--query` supplies the input query. The corresponding index is built automatically if it does not exist.
-
-### H1: BM25
-
-```bash
-python scripts/retrieve.py \
-  --config configs/examples/h1_sparse_hierarchical.yaml \
-  --query "điều kiện cấp giấy chứng nhận quyền sử dụng đất" \
-  --top-k 10\
-  > artifacts/reports/h1_sparse_hierachical.json
-```
-
-### H2: dense retrieval
-
-```bash
-python scripts/retrieve.py \
-  --config configs/examples/h2_dense_hierarchical.yaml \
-  --query "điều kiện cấp giấy chứng nhận quyền sử dụng đất" \
-  --top-k 10 \
-  > artifacts/reports/h2_dense_hierarchical.json
-```
-
-### H3: BM25 + dense + RRF
-
-```bash
-python scripts/retrieve.py \
-  --config configs/examples/h3_hybrid_rrf.yaml \
-  --query "trình tự đăng ký đất đai" \
-  --top-k 10 \ 
-  > artifacts/reports/h3_hybrid_rrf.json
-```
-
-### H4: hybrid retrieval + reranking
-
-```bash
-python scripts/retrieve.py \
-  --config configs/examples/h4_hybrid_rerank.yaml \
-  --query "điều kiện chuyển nhượng quyền sử dụng đất" \
-  --top-k 10 \
-  > artifacts/reports/h4_hybrid_rerank.json
-```
-
-### H5: fixed-length chunks + hybrid retrieval
-
-```bash
-python scripts/retrieve.py \
-  --config configs/examples/h5_fixed_length_hybrid.yaml \
-  --query "điều kiện cấp giấy chứng nhận quyền sử dụng đất" \
-  --top-k 10 \
-  > artifacts/reports/h5_fixed_length_hybrid.json
-```
-
-Metadata filters can be repeated:
+Use `retrieve.py` for quick inspection. The corresponding content-addressed
+index is built automatically when missing.
 
 ```bash
 python scripts/retrieve.py \
   --config configs/examples/h1_sparse_hierarchical.yaml \
-  --query "đăng ký đất đai" \
+  --query "điều kiện cấp giấy chứng nhận quyền sử dụng đất" \
   --top-k 10 \
-  --filter doc_type=law \
-  --filter unit_type=article
+  > artifacts/reports/h1_sparse_hierarchical.json
 ```
 
-The command prints JSON results containing rank, score, source, component scores, record ID, source legal-unit IDs, metadata, and indexed text.
-
-To build an index without running a query:
-
-```bash
-python scripts/build_index.py \
-  --config configs/examples/h3_hybrid_rrf.yaml
-```
+See the [experiment guide](docs/EXPERIMENT_GUIDE.md) for every H1-H9 config,
+metadata filters, temporal query explanations, suites, and heavy-model notes.
 
 ## 5. Run multiple queries
 

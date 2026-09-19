@@ -20,7 +20,7 @@ corpus:
   required_fields: [unit_id, doc_id, unit_type, text]
 
 representation:
-  # hierarchical_units | fixed_length
+  # hierarchical_units | fixed_length | parent_child
   mode: hierarchical_units
 
   # Text sent to sparse/dense indexing. Toggle fields to test feature hypotheses.
@@ -43,6 +43,35 @@ representation:
     chunk_size: 220
     overlap: 40
 
+  # Used by the contextual-child and parent-to-child hypotheses. Relationships
+  # are resolved from doc_id/article/effective interval in data/enriched.
+  parent_child:
+    parent_unit_type: article
+    child_unit_types: [clause, point]
+    include_parent_records: false
+    orphan_policy: error
+    child_fields:
+      - name: citation_surface
+        prefix: "[CITATION] "
+        enabled: true
+      - name: text
+        prefix: "[CHILD] "
+        enabled: true
+    parent_fields:
+      - name: citation_surface
+        prefix: "[CITATION] "
+        enabled: true
+      - name: title_chain
+        prefix: "[TITLE] "
+        enabled: true
+      - name: text
+        prefix: "[TEXT] "
+        enabled: true
+    context:
+      include_parent_heading: false
+      parent_prefix: "[PARENT] "
+      parent_heading_max_words: 40
+
 query_processing:
   normalize_whitespace: true
   lowercase_for_sparse: true
@@ -57,6 +86,14 @@ query_processing:
   metadata_filter:
     enabled: true
     oversample_factor: 4
+
+# Temporal filtering is opt-in so existing H1-H6 behavior stays unchanged.
+# reference_date should be pinned in experiment configs for reproducibility.
+temporal:
+  enabled: false
+  reference_date: null
+  missing_date_policy: error
+  strip_time_from_query: true
 
 indexing:
   # This is an artifact namespace. The actual immutable index is stored under
@@ -90,6 +127,13 @@ retrieval:
   sparse_top_k: 50
   dense_top_k: 50
   candidate_top_k: 50
+  parent_child:
+    enabled: false
+    parent_top_k: 10
+    child_top_k: 50
+    rrf_k: 60
+    parent_weight: 0.7
+    child_weight: 1.0
 
 fusion:
   # none | rrf | weighted

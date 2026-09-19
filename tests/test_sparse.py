@@ -11,3 +11,14 @@ def test_bm25_prefers_matching_document():
     index.build(records)
     hits = index.search("registration certificate", 2)
     assert hits[0].record_id == "b"
+
+
+def test_bm25_applies_allow_list_before_ranking():
+    records = [
+        RetrievalRecord("current", "land certificate", "land certificate", ["current"]),
+        RetrievalRecord("historical", "land certificate historical", "land certificate historical", ["historical"]),
+    ]
+    index = BM25Index()
+    index.build(records)
+    hits = index.search("land certificate", 10, {"historical"})
+    assert [hit.record_id for hit in hits] == ["historical"]

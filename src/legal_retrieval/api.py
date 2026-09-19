@@ -30,6 +30,7 @@ def create_app(cfg: dict[str, Any]):
             hits = pipeline.retrieve(req.query, top_k=req.top_k, filters=req.filters)
             return {
                 "query": req.query,
+                "query_context": pipeline.last_query_context,
                 "count": len(hits),
                 "results": [h.to_dict(include_text=True) for h in hits],
             }
