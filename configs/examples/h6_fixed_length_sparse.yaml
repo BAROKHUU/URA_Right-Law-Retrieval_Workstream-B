@@ -1,15 +1,18 @@
-extends: ../base.yaml
+extends: h1_sparse_hierarchical.yaml
 
 hypothesis:
-  id: H3
-  description: "Hierarchical legal units + BM25/BGE-M3 hybrid retrieval with RRF."
+  id: H6
+  description: "Fixed-length document-wise chunks vs hierarchical legal units under the same sparse BM25 retriever."
   variables:
-    - "indexing.dense.enabled"
-    - "retrieval.method"
-    - "fusion.method"
+    - "representation.mode"
+    - "representation.fixed_length.source_unit_types"
+    - "representation.fixed_length.unit"
+    - "representation.fixed_length.chunk_size"
+    - "representation.fixed_length.overlap"
+    - "ranking.deduplicate_by"
 
 representation:
-  mode: hierarchical_units
+  mode: fixed_length
   fields:
     - name: citation_surface
       prefix: "[CITATION] "
@@ -20,16 +23,21 @@ representation:
     - name: text
       prefix: "[TEXT] "
       enabled: true
+  fixed_length:
+    source_unit_types: [article, clause, point]
+    unit: words
+    chunk_size: 220
+    overlap: 40
 
 indexing:
-  output_dir: artifacts/indexes/h3_hybrid_rrf
+  output_dir: artifacts/indexes/h6_fixed_length_sparse
   sparse:
     enabled: true
     backend: bm25
     k1: 1.5
     b: 0.75
   dense:
-    enabled: true
+    enabled: false
     backend: faiss
     index_type: FlatIP
     model_name: BAAI/bge-m3
@@ -42,7 +50,7 @@ indexing:
     query_prefix: ""
 
 retrieval:
-  method: hybrid
+  method: sparse
   sparse_top_k: 50
   dense_top_k: 50
   candidate_top_k: 50
@@ -55,7 +63,7 @@ retrieval:
     child_weight: 1.0
 
 fusion:
-  method: rrf
+  method: none
   rrf_k: 60
   sparse_weight: 0.5
   dense_weight: 0.5
@@ -71,7 +79,9 @@ reranking:
 
 ranking:
   final_top_k: 10
-  deduplicate_by: source_unit
+  # Fixed-length chunks are synthetic records,
+  # so keep different chunks as different retrieval records.
+  deduplicate_by: record_id
 
 temporal:
   enabled: false

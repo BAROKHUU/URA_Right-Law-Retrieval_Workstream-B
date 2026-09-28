@@ -1,0 +1,13 @@
+# Full experiment matrix. H2-H5 download/use dense and reranker models and can
+# require substantial time, RAM, disk, and (optionally) GPU memory.
+continue_on_error: false
+configs:
+  - ../examples/h1_sparse_hierarchical.yaml
+  - ../examples/h2_dense_hierarchical.yaml
+  - ../examples/h3_hybrid_rrf.yaml
+  - ../examples/h4_hybrid_rerank.yaml
+  - ../examples/h5_fixed_length_hybrid.yaml
+  - ../examples/h6_fixed_length_sparse.yaml
+  - ../examples/h7_child_temporal.yaml
+  - ../examples/h8_contextual_child_temporal.yaml
+  - ../examples/h9_parent_to_child_temporal.yaml

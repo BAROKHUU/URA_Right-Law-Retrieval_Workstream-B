@@ -152,8 +152,11 @@ def _require_hf_commit(path: str, revision: Any) -> None:
 
 def validate_config(cfg: dict[str, Any]) -> None:
     mode = cfg.get("representation", {}).get("mode")
-    if mode not in {"hierarchical_units", "fixed_length"}:
-        raise ValueError(f"representation.mode must be hierarchical_units or fixed_length, got {mode!r}")
+    if mode not in {"hierarchical_units", "fixed_length", "parent_child"}:
+        raise ValueError(
+            "representation.mode must be hierarchical_units, fixed_length, or parent_child, "
+            f"got {mode!r}"
+        )
 
     method = cfg.get("retrieval", {}).get("method")
     if method not in {"sparse", "dense", "hybrid"}:
@@ -210,6 +213,35 @@ def validate_config(cfg: dict[str, Any]) -> None:
         positive("representation.fixed_length.chunk_size", size)
         if not isinstance(overlap, int) or isinstance(overlap, bool) or not 0 <= overlap < size:
             raise ValueError("representation.fixed_length.overlap must satisfy 0 <= overlap < chunk_size")
+
+    parent_child = cfg.get("representation", {}).get("parent_child", {})
+    if mode == "parent_child":
+        if not parent_child.get("child_unit_types"):
+            raise ValueError("representation.parent_child.child_unit_types must not be empty")
+        positive(
+            "representation.parent_child.context.parent_heading_max_words",
+            parent_child.get("context", {}).get("parent_heading_max_words"),
+        )
+        if parent_child.get("orphan_policy", "error") not in {"error", "skip"}:
+            raise ValueError("representation.parent_child.orphan_policy must be error or skip")
+
+    parent_retrieval = retrieval.get("parent_child", {})
+    if parent_retrieval.get("enabled"):
+        if mode != "parent_child":
+            raise ValueError("retrieval.parent_child.enabled requires representation.mode=parent_child")
+        if not parent_child.get("include_parent_records"):
+            raise ValueError(
+                "retrieval.parent_child.enabled requires representation.parent_child.include_parent_records=true"
+            )
+        for key in ("parent_top_k", "child_top_k", "rrf_k"):
+            positive(f"retrieval.parent_child.{key}", parent_retrieval.get(key))
+        for key in ("parent_weight", "child_weight"):
+            if float(parent_retrieval.get(key, 0.0)) < 0:
+                raise ValueError(f"retrieval.parent_child.{key} must be non-negative")
+
+    temporal = cfg.get("temporal", {})
+    if temporal.get("missing_date_policy", "error") not in {"error", "exclude", "include"}:
+        raise ValueError("temporal.missing_date_policy must be error, exclude, or include")
 
     if fusion == "weighted":
         normalization = cfg.get("fusion", {}).get("score_normalization", "minmax")

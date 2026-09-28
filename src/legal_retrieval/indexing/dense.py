@@ -13,7 +13,12 @@ class BaseDenseIndex(ABC):
     def build(self, embeddings: np.ndarray, record_ids: list[str]) -> None: ...
 
     @abstractmethod
-    def search(self, query_embedding: np.ndarray, top_k: int) -> list[SearchHit]: ...
+    def search(
+        self,
+        query_embedding: np.ndarray,
+        top_k: int,
+        allowed_record_ids: set[str] | None = None,
+    ) -> list[SearchHit]: ...
 
     @abstractmethod
     def save(self, directory: Path) -> None: ...
@@ -52,15 +57,28 @@ class NumpyFlatIndex(BaseDenseIndex):
         self.embeddings = np.asarray(embeddings, dtype="float32")
         self.record_ids = list(record_ids)
 
-    def search(self, query_embedding: np.ndarray, top_k: int) -> list[SearchHit]:
+    def search(
+        self,
+        query_embedding: np.ndarray,
+        top_k: int,
+        allowed_record_ids: set[str] | None = None,
+    ) -> list[SearchHit]:
         if self.embeddings is None:
             raise RuntimeError("Index not built")
         q = np.asarray(query_embedding, dtype="float32").reshape(-1)
         scores = self.embeddings @ q
-        if len(scores) == 0:
+        eligible = np.arange(len(scores))
+        if allowed_record_ids is not None:
+            eligible = np.asarray(
+                [i for i, record_id in enumerate(self.record_ids) if record_id in allowed_record_ids],
+                dtype=int,
+            )
+        if len(eligible) == 0:
             return []
-        k = min(top_k, len(scores))
-        idx = np.argpartition(-scores, k - 1)[:k]
+        k = min(top_k, len(eligible))
+        eligible_scores = scores[eligible]
+        local_idx = np.argpartition(-eligible_scores, k - 1)[:k]
+        idx = eligible[local_idx]
         idx = idx[np.argsort(-scores[idx])]
         return [SearchHit(record_id=self.record_ids[i], score=float(scores[i]), rank=r + 1, source="dense")
                 for r, i in enumerate(idx)]
@@ -114,20 +132,36 @@ class FaissDenseIndex(BaseDenseIndex):
         self.index.add(x)
         self.record_ids = list(record_ids)
 
-    def search(self, query_embedding: np.ndarray, top_k: int) -> list[SearchHit]:
+    def search(
+        self,
+        query_embedding: np.ndarray,
+        top_k: int,
+        allowed_record_ids: set[str] | None = None,
+    ) -> list[SearchHit]:
         if self.index is None:
             raise RuntimeError("Index not built")
         q = np.ascontiguousarray(query_embedding, dtype="float32").reshape(1, -1)
-        k = min(top_k, len(self.record_ids))
+        # Flat FAISS indexes do not expose portable metadata filtering. Search
+        # all records when an allow-list is present, then filter exactly. This
+        # favors temporal correctness for the current medium corpus. A vector
+        # database/backend with native pre-filtering can replace this backend
+        # for larger deployments through the existing backend registry.
+        k = len(self.record_ids) if allowed_record_ids is not None else min(top_k, len(self.record_ids))
+        if k == 0:
+            return []
         scores, indices = self.index.search(q, k)
         hits = []
-        for rank, (score, idx) in enumerate(zip(scores[0], indices[0]), start=1):
+        for score, idx in zip(scores[0], indices[0]):
             if idx < 0:
+                continue
+            if allowed_record_ids is not None and self.record_ids[idx] not in allowed_record_ids:
                 continue
             # SearchHit scores consistently mean "higher is better". FAISS L2
             # returns distances (lower is better), so expose their negative.
             value = -float(score) if self.cfg.get("index_type", "FlatIP") == "FlatL2" else float(score)
-            hits.append(SearchHit(record_id=self.record_ids[idx], score=value, rank=rank, source="dense"))
+            hits.append(SearchHit(record_id=self.record_ids[idx], score=value, rank=len(hits) + 1, source="dense"))
+            if len(hits) >= top_k:
+                break
         return hits
 
     def save(self, directory: Path) -> None:

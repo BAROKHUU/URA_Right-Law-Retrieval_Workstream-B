@@ -6,6 +6,7 @@ import logging
 import glob
 import os
 import shutil
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,8 @@ class IndexManager:
         # sibling directory instead of replacing an earlier experiment.
         self.index_signature = self.signature()
         self.index_dir = self.index_root / self.index_signature
+        self.last_operation = "not_run"
+        self.last_operation_seconds = 0.0
 
     def _signature_payload(self) -> dict[str, Any]:
         return {
@@ -93,14 +96,21 @@ class IndexManager:
         return not self._is_complete()
 
     def ensure(self) -> None:
+        started = time.perf_counter()
         if self.needs_build():
             if not self.cfg.get("runtime", {}).get("auto_build_index", True) and not self.cfg.get("runtime", {}).get("force_rebuild", False):
                 raise FileNotFoundError(f"Index is missing/stale: {self.index_dir}")
             self.build()
+            return
+        self.last_operation = "reused"
+        self.last_operation_seconds = time.perf_counter() - started
 
     def build(self) -> None:
+        started = time.perf_counter()
         if self._is_complete():
             logger.info("Immutable index already exists; reusing %s", self.index_dir)
+            self.last_operation = "reused"
+            self.last_operation_seconds = time.perf_counter() - started
             return
         if self.index_dir.exists():
             # Preserve an interrupted/corrupt artifact for inspection while
@@ -155,6 +165,8 @@ class IndexManager:
             if not self.manifest_path.exists():
                 raise
             shutil.rmtree(build_dir)
+        self.last_operation = "built"
+        self.last_operation_seconds = time.perf_counter() - started
         logger.info("Index ready at %s", self.index_dir)
 
     def load_records(self) -> list[RetrievalRecord]:

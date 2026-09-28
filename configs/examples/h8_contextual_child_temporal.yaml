@@ -1,25 +1,42 @@
-extends: ../base.yaml
+extends: h7_child_temporal.yaml
 
 hypothesis:
-  id: H1
-  description: "Hierarchical legal units + BM25 baseline."
-  variables: []
+  id: H8
+  description: "Clause/Point children enriched with their Article heading and temporal pre-filtering."
+  variables:
+    - representation.parent_child.context.include_parent_heading
 
 representation:
-  mode: hierarchical_units
-  fields:
-    - name: citation_surface
-      prefix: "[CITATION] "
-      enabled: true
-    - name: title_chain
-      prefix: "[TITLE] "
-      enabled: true
-    - name: text
-      prefix: "[TEXT] "
-      enabled: true
+  mode: parent_child
+  parent_child:
+    parent_unit_type: article
+    child_unit_types: [clause, point]
+    include_parent_records: false
+    orphan_policy: error
+    child_fields:
+      - name: citation_surface
+        prefix: "[CITATION] "
+        enabled: true
+      - name: text
+        prefix: "[CHILD] "
+        enabled: true
+    parent_fields:
+      - name: citation_surface
+        prefix: "[CITATION] "
+        enabled: true
+      - name: title_chain
+        prefix: "[TITLE] "
+        enabled: true
+      - name: text
+        prefix: "[TEXT] "
+        enabled: true
+    context:
+      include_parent_heading: true
+      parent_prefix: "[PARENT] "
+      parent_heading_max_words: 40
 
 indexing:
-  output_dir: artifacts/indexes/h1_sparse_hierarchical
+  output_dir: artifacts/indexes/h8_contextual_child_temporal
   sparse:
     enabled: true
     backend: bm25
@@ -71,7 +88,7 @@ ranking:
   deduplicate_by: source_unit
 
 temporal:
-  enabled: false
+  enabled: true
   reference_date: "2026-09-19"
   missing_date_policy: error
   strip_time_from_query: true

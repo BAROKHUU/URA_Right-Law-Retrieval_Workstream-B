@@ -22,12 +22,23 @@ def main():
     p.add_argument("--query", required=True)
     p.add_argument("--top-k", type=int, default=None)
     p.add_argument("--filter", action="append", default=[], help="Metadata filter key=value; repeatable.")
+    p.add_argument(
+        "--explain-query",
+        action="store_true",
+        help="Include parsed temporal constraints and eligible-record count in the JSON output.",
+    )
     args = p.parse_args()
     cfg = load_config(args.config)
     configure_logging(cfg.get("runtime", {}).get("log_level", "INFO"))
     pipeline = RetrievalPipeline(cfg)
     hits = pipeline.retrieve(args.query, top_k=args.top_k, filters=parse_filter(args.filter))
-    print(json.dumps([h.to_dict(include_text=True) for h in hits], ensure_ascii=False, indent=2))
+    results = [h.to_dict(include_text=True) for h in hits]
+    payload = {
+        "query": args.query,
+        "query_context": pipeline.last_query_context,
+        "results": results,
+    } if args.explain_query else results
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

@@ -11,3 +11,13 @@ def test_numpy_flat_dense_backend(tmp_path):
     index.save(tmp_path)
     loaded = NumpyFlatIndex.load(tmp_path, {})
     assert loaded.search(np.array([0.1, 0.9], dtype='float32'), 1)[0].record_id == 'b'
+
+
+def test_numpy_flat_dense_backend_filters_before_top_k():
+    index = NumpyFlatIndex({})
+    index.build(
+        np.array([[1.0, 0.0], [0.8, 0.2], [0.0, 1.0]], dtype="float32"),
+        ["future", "valid", "unrelated"],
+    )
+    hits = index.search(np.array([1.0, 0.0], dtype="float32"), 1, {"valid", "unrelated"})
+    assert [hit.record_id for hit in hits] == ["valid"]
