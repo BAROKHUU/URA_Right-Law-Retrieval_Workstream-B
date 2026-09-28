@@ -18,6 +18,13 @@ from .evaluation import load_benchmark, evaluate_query, aggregate_metrics
 from .io_utils import write_jsonl
 from .paths import project_root
 from .pipeline import RetrievalPipeline
+from .runtime_metrics import (
+    directory_size_bytes,
+    latency_summary,
+    reset_gpu_peak_memory,
+    resource_usage,
+    synchronize_gpu,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +70,50 @@ def _git_revision() -> str | None:
         return None
 
 
+def _model_revisions(cfg: dict[str, Any]) -> dict[str, Any]:
+    dense = cfg.get("indexing", {}).get("dense", {})
+    rerankers = cfg.get("reranking", {}).get("models", [])
+    return {
+        "dense": {
+            "enabled": bool(dense.get("enabled")),
+            "model_name": dense.get("model_name"),
+            "revision": dense.get("revision"),
+        },
+        "rerankers": [
+            {
+                "model_name": spec.get("model_name"),
+                "revision": spec.get("revision"),
+            }
+            for spec in rerankers
+        ],
+    }
+
+
+def _runtime_summary(
+    *,
+    started: float,
+    pipeline_setup_seconds: float,
+    pipeline: RetrievalPipeline,
+    query_latencies: list[float],
+) -> dict[str, Any]:
+    total_seconds = time.perf_counter() - started
+    latency = latency_summary(query_latencies)
+    query_total = float(latency["total_seconds"] or 0.0)
+    return {
+        "total_seconds": total_seconds,
+        "pipeline_setup_seconds": pipeline_setup_seconds,
+        "index_operation": pipeline.manager.last_operation,
+        "index_operation_seconds": pipeline.manager.last_operation_seconds,
+        "query_latency": latency,
+        "throughput_queries_per_second": len(query_latencies) / query_total if query_total > 0 else None,
+    }
+
+
 def run_experiment(cfg: dict[str, Any]) -> Path:
     started = time.perf_counter()
     seed = int(cfg.get("project", {}).get("seed", 42))
     _seed_everything(seed)
+    reset_gpu_peak_memory()
     hypothesis = cfg.get("hypothesis", {})
     name = str(hypothesis.get("id") or "experiment")
     run_dir = project_root() / "artifacts" / "runs" / name / _run_id()
@@ -90,6 +137,8 @@ def run_experiment(cfg: dict[str, Any]) -> Path:
         "git_revision": _git_revision(),
         "package_versions": _package_versions(),
         "reproducibility_mode": cfg.get("runtime", {}).get("reproducibility_mode", "development"),
+        "model_revisions": _model_revisions(cfg),
+        "temporal_reference_date": cfg.get("temporal", {}).get("reference_date"),
         "config_path": cfg.get("_config_path"),
         "baseline_config_path": cfg.get("_baseline_config_path"),
         "hypothesis_diff": hypothesis_diff,
@@ -98,15 +147,27 @@ def run_experiment(cfg: dict[str, Any]) -> Path:
         json.dumps(run_metadata, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
+    pipeline_started = time.perf_counter()
     pipeline = RetrievalPipeline(cfg)
+    pipeline_setup_seconds = time.perf_counter() - pipeline_started
+    index_size = directory_size_bytes(pipeline.manager.index_dir)
     benchmark = load_benchmark(cfg)
     if not benchmark:
+        runtime = _runtime_summary(
+            started=started,
+            pipeline_setup_seconds=pipeline_setup_seconds,
+            pipeline=pipeline,
+            query_latencies=[],
+        )
         status = {
             "status": "index_ready_no_benchmark",
             "message": "No evaluation.benchmark_path configured; index was built/loaded successfully.",
             "index_dir": str(pipeline.manager.index_dir),
             "index_signature": pipeline.manager.index_signature,
-            "duration_seconds": time.perf_counter() - started,
+            "index_size_bytes": index_size,
+            "duration_seconds": runtime["total_seconds"],
+            "runtime": runtime,
+            "resources": resource_usage(),
         }
         (run_dir / "run_summary.json").write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
         logger.info(status["message"])
@@ -116,13 +177,20 @@ def run_experiment(cfg: dict[str, Any]) -> Path:
     rows = []
     metric_rows = []
     labeled_count = 0
+    query_latencies: list[float] = []
     for item in benchmark:
+        synchronize_gpu()
+        query_started = time.perf_counter()
         hits = pipeline.retrieve(item.query, top_k=max_k, filters=item.filters)
+        synchronize_gpu()
+        query_latency = time.perf_counter() - query_started
+        query_latencies.append(query_latency)
         row = {
             "query_id": item.query_id,
             "query": item.query,
             "filters": item.filters,
             "query_context": pipeline.last_query_context,
+            "query_latency_seconds": query_latency,
             "relevant_unit_ids": item.relevant_ids,
             "results": [h.to_dict(include_text=True) for h in hits],
         }
@@ -137,6 +205,12 @@ def run_experiment(cfg: dict[str, Any]) -> Path:
         write_jsonl(run_dir / "per_query.jsonl", rows)
     metrics = aggregate_metrics(metric_rows)
     (run_dir / "metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
+    runtime = _runtime_summary(
+        started=started,
+        pipeline_setup_seconds=pipeline_setup_seconds,
+        pipeline=pipeline,
+        query_latencies=query_latencies,
+    )
     summary = {
         "status": "completed",
         "query_count": len(benchmark),
@@ -144,7 +218,10 @@ def run_experiment(cfg: dict[str, Any]) -> Path:
         "metrics": metrics,
         "index_dir": str(pipeline.manager.index_dir),
         "index_signature": pipeline.manager.index_signature,
-        "duration_seconds": time.perf_counter() - started,
+        "index_size_bytes": index_size,
+        "duration_seconds": runtime["total_seconds"],
+        "runtime": runtime,
+        "resources": resource_usage(),
     }
     (run_dir / "run_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     return run_dir

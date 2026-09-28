@@ -135,8 +135,8 @@ indexing:
     backend: faiss
     index_type: FlatIP
     model_name: intfloat/multilingual-e5-large
-    # Pin a Hugging Face commit hash for final reproducible runs.
-    revision: null
+    # Pinned Hugging Face commit for reproducible runs.
+    revision: 5617a9f61b028005a4858fdac845db406aefb181
     device: auto
     batch_size: 8
     normalize_embeddings: true

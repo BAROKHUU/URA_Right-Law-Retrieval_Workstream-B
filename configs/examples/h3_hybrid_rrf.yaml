@@ -33,7 +33,7 @@ indexing:
     backend: faiss
     index_type: FlatIP
     model_name: BAAI/bge-m3
-    revision: null
+    revision: 5617a9f61b028005a4858fdac845db406aefb181
     device: auto
     batch_size: 8
     normalize_embeddings: true
@@ -75,6 +75,6 @@ ranking:
 
 temporal:
   enabled: false
-  reference_date: null
+  reference_date: "2026-09-19"
   missing_date_policy: error
   strip_time_from_query: true

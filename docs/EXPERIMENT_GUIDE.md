@@ -25,6 +25,17 @@ are lightweight BM25 comparison groups. H2-H5 download Hugging Face models and
 may require substantial time, RAM, and disk space. A GPU is optional but
 recommended.
 
+The experiment configs pin model snapshots instead of tracking mutable model
+branches:
+
+- `BAAI/bge-m3`: `5617a9f61b028005a4858fdac845db406aefb181`
+- `BAAI/bge-reranker-v2-m3`: `953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e`
+- Temporal campaign reference date: `2026-09-19`
+
+`runtime.reproducibility_mode` is set to `final`, so config validation rejects
+any enabled Hugging Face model whose revision is not a full 40-character commit
+SHA.
+
 All H1-H9 files intentionally follow the same top-level section order and
 repeat their effective indexing, retrieval, fusion, reranking, ranking, and
 temporal settings so that each YAML file is readable on its own. Mode-specific
@@ -231,6 +242,20 @@ artifacts/runs/<hypothesis-id>/<run-id>/
 └── per_query.jsonl
 ```
 
+`run_summary.json` also records:
+
+- index build/reuse operation and duration;
+- pipeline setup and total runtime;
+- per-query mean, median, p95, cold-first-query, and warm-query latency;
+- throughput in queries per second;
+- exact index size in bytes;
+- peak process RAM and per-device CUDA allocated/reserved memory.
+
+Each `per_query.jsonl` row contains `query_latency_seconds`. Peak RAM uses the
+operating system's process high-water mark; CUDA values use PyTorch peak memory
+counters. These are machine-dependent operational metrics, so compare runs on
+the same hardware and software environment.
+
 Export one comparison table:
 
 ```bash
@@ -251,8 +276,8 @@ Inspect files in this order:
 
 - Use the same corpus snapshot and benchmark version.
 - Change only variables declared under `hypothesis.variables`.
-- Pin `temporal.reference_date` for H7-H9.
-- Pin full Hugging Face commit SHAs and enable
+- Keep the campaign-level `temporal.reference_date` fixed for H7-H9.
+- Keep full Hugging Face commit SHAs pinned and enable
   `runtime.reproducibility_mode: final` for final dense/reranker runs.
 - Do not evaluate from one query or only the first result.
 - Compare aggregate metrics and inspect `per_query.jsonl`.

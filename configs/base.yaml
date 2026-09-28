@@ -91,7 +91,8 @@ query_processing:
 # reference_date should be pinned in experiment configs for reproducibility.
 temporal:
   enabled: false
-  reference_date: null
+  # Pinned campaign date; update intentionally in a new experiment campaign.
+  reference_date: "2026-09-19"
   missing_date_policy: error
   strip_time_from_query: true
 
@@ -113,7 +114,7 @@ indexing:
     model_name: BAAI/bge-m3
     # Required in runtime.reproducibility_mode=final.
     # Use the full 40-character Hugging Face commit SHA.
-    revision: null
+    revision: 5617a9f61b028005a4858fdac845db406aefb181
     device: auto
     batch_size: 8
     normalize_embeddings: true
@@ -151,10 +152,10 @@ reranking:
   aggregation: weighted
   rrf_k: 60
   models: []
-  # Example:
+  # Example (revision pinned to the current campaign model snapshot):
   # models:
   #   - model_name: BAAI/bge-reranker-v2-m3
-  #     revision: 0123456789abcdef0123456789abcdef01234567
+  #     revision: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
   #     weight: 1.0
   #     device: auto
   #     trust_remote_code: false
@@ -188,6 +189,5 @@ runtime:
   # and are reused even when a force build is requested.
   force_rebuild: false
   log_level: INFO
-  # development: revisions may be null while iterating quickly.
-  # final: every enabled Hugging Face dense/reranker model must use a 40-char SHA.
-  reproducibility_mode: development
+  # Final mode rejects any enabled Hugging Face model without a full commit SHA.
+  reproducibility_mode: final
